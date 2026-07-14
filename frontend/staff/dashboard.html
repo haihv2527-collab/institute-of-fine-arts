@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Staff Overview — Institute of Fine Arts</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+<div id="site-header"></div>
+<div class="dash-shell" id="dash-shell"></div>
+
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+  const user = Auth.guard(["staff"]);
+  renderHeader();
+  renderDashShell({ role: "staff", active: "/staff/dashboard.html", title: "Overview" });
+
+  async function load() {
+    const main = document.getElementById("dash-main-content");
+    try {
+      const [competitions, submissions, exhibitions] = await Promise.all([
+        api.get("/competitions"),
+        api.get("/submissions"),
+        api.get("/exhibitions"),
+      ]);
+      const ongoing = competitions.filter((c) => c.status === "ongoing").length;
+      const pending = submissions.filter((s) => !s.mark).length;
+
+      main.innerHTML = `
+        <div class="stat-cards">
+          <div class="stat-card"><div class="num">${competitions.length}</div><div class="cap">Competitions</div></div>
+          <div class="stat-card"><div class="num">${ongoing}</div><div class="cap">Ongoing now</div></div>
+          <div class="stat-card"><div class="num">${submissions.length}</div><div class="cap">Total submissions</div></div>
+          <div class="stat-card"><div class="num">${pending}</div><div class="cap">Awaiting a mark</div></div>
+          <div class="stat-card"><div class="num">${exhibitions.length}</div><div class="cap">Exhibitions</div></div>
+        </div>
+        <p class="hint">Welcome, ${escapeHtml(user.full_name)}. Start with
+        <a href="/staff/competitions.html">Competitions</a> to set up a contest, then
+        <a href="/staff/submissions.html">Judge Submissions</a> as entries come in.</p>
+      `;
+    } catch (err) {
+      toast(err.message, true);
+    }
+  }
+  load();
+</script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Manager Overview — Institute of Fine Arts</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+<div id="site-header"></div>
+<div class="dash-shell" id="dash-shell"></div>
+
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+  const user = Auth.guard(["manager", "admin"]);
+  renderHeader();
+  renderDashShell({ role: "manager", active: "/manager/dashboard.html", title: "Overview" });
+
+  async function load() {
+    const main = document.getElementById("dash-main-content");
+    try {
+      const c = await api.get("/manager/overview");
+      main.innerHTML = `
+        <div class="stat-cards">
+          <div class="stat-card"><div class="num">${c.students}</div><div class="cap">Students</div></div>
+          <div class="stat-card"><div class="num">${c.staff}</div><div class="cap">Staff</div></div>
+          <div class="stat-card"><div class="num">${c.competitions}</div><div class="cap">Competitions</div></div>
+          <div class="stat-card"><div class="num">${c.submissions}</div><div class="cap">Submissions</div></div>
+          <div class="stat-card"><div class="num">${c.awards}</div><div class="cap">Awards given</div></div>
+          <div class="stat-card"><div class="num">${c.exhibitions}</div><div class="cap">Exhibitions</div></div>
+          <div class="stat-card"><div class="num">${c.paintings_sold}</div><div class="cap">Paintings sold</div></div>
+        </div>
+        <p class="hint">Welcome, ${escapeHtml(user.full_name)}. Head to <a href="/manager/reports.html">Reports</a>
+        for a full breakdown of best submissions, staff remarks, and exhibition sales.</p>
+      `;
+    } catch (err) {
+      toast(err.message, true);
+    }
+  }
+  load();
+</script>
+</body>
+</html>

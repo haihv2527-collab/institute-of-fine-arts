@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sign in — Institute of Fine Arts</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+<div class="login-shell">
+  <div class="login-card">
+    <div class="frame">
+      <span class="corner tl"></span><span class="corner tr"></span>
+      <span class="corner bl"></span><span class="corner br"></span>
+      <span class="eyebrow">Institute of Fine Arts</span>
+      <h1>Sign in</h1>
+      <p class="hint">Use your Administrator, Manager, Staff, or Student account.</p>
+
+      <form id="login-form">
+        <label for="username">Username</label>
+        <input id="username" name="username" autocomplete="username" required />
+
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+
+        <div id="login-error" class="error-text" style="display:none;"></div>
+
+        <button class="btn gold" type="submit" style="width:100%; justify-content:center;">Sign in</button>
+      </form>
+
+      <div class="demo-accounts">
+        Demo accounts (after running <code>npm run seed</code>):<br/>
+        admin / admin123 &nbsp;·&nbsp; manager / manager123<br/>
+        teacher / teacher123 (staff) &nbsp;·&nbsp; student / student123
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+  // If already logged in, skip straight to the right dashboard
+  const existing = Auth.getUser();
+  if (existing) window.location.href = roleHome(existing.role);
+
+  document.getElementById("login-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const errorBox = document.getElementById("login-error");
+    errorBox.style.display = "none";
+
+    const username = document.getElementById("username").value.trim();
+    const password = document.getElementById("password").value;
+
+    try {
+      const { token, user } = await api.post("/auth/login", { username, password });
+      Auth.setSession(token, user);
+      window.location.href = roleHome(user.role);
+    } catch (err) {
+      errorBox.textContent = err.message;
+      errorBox.style.display = "block";
+    }
+  });
+</script>
+</body>
+</html>

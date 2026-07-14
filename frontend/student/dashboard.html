@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>My Dashboard — Institute of Fine Arts</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+<div id="site-header"></div>
+<div class="dash-shell" id="dash-shell"></div>
+
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+  const user = Auth.guard(["student"]);
+  renderHeader();
+  renderDashShell({ role: "student", active: "/student/dashboard.html", title: "Overview" });
+
+  async function load() {
+    const main = document.getElementById("dash-main-content");
+    try {
+      const [competitions, submissions, awards] = await Promise.all([
+        api.get("/competitions?status=ongoing"),
+        api.get("/submissions"),
+        api.get("/awards"),
+      ]);
+      const bestCount = submissions.filter((s) => s.mark === "Best").length;
+
+      main.innerHTML = `
+        <div class="stat-cards">
+          <div class="stat-card"><div class="num">${competitions.length}</div><div class="cap">Ongoing competitions</div></div>
+          <div class="stat-card"><div class="num">${submissions.length}</div><div class="cap">My submissions</div></div>
+          <div class="stat-card"><div class="num">${bestCount}</div><div class="cap">Marked "Best"</div></div>
+          <div class="stat-card"><div class="num">${awards.length}</div><div class="cap">Awards won</div></div>
+        </div>
+        <p class="hint">Welcome, ${escapeHtml(user.full_name)}. Browse
+        <a href="/student/competitions.html">Competitions</a> to submit a painting, or check
+        <a href="/student/my-submissions.html">My Submissions</a> for feedback from your teacher.</p>
+      `;
+    } catch (err) {
+      toast(err.message, true);
+    }
+  }
+  load();
+</script>
+</body>
+</html>

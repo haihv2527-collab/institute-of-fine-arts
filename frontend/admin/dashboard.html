@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Admin Overview — Institute of Fine Arts</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+<div id="site-header"></div>
+<div class="dash-shell" id="dash-shell"></div>
+
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+  const user = Auth.guard(["admin"]);
+  renderHeader();
+  renderDashShell({ role: "admin", active: "/admin/dashboard.html", title: "Overview" });
+
+  async function load() {
+    const main = document.getElementById("dash-main-content");
+    try {
+      const [staff, students] = await Promise.all([
+        api.get("/admin/staff"),
+        api.get("/admin/students"),
+      ]);
+
+      main.innerHTML = `
+        <div class="stat-cards">
+          <div class="stat-card"><div class="num">${staff.length}</div><div class="cap">Staff accounts</div></div>
+          <div class="stat-card"><div class="num">${students.length}</div><div class="cap">Student accounts</div></div>
+        </div>
+        <p class="hint">Welcome, ${escapeHtml(user.full_name)}. Use the panel on the left to manage staff and
+        student accounts — the two account types you're responsible for provisioning. Competitions, marking,
+        and exhibitions are managed by staff accounts.</p>
+      `;
+    } catch (err) {
+      toast(err.message, true);
+    }
+  }
+  load();
+</script>
+</body>
+</html>
