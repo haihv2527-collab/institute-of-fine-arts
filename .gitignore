@@ -1,7 +1,9 @@
 node_modules/
 backend/.env
-backend/data/
+# backend/data/
 backend/uploads/submissions/*
 !backend/uploads/submissions/.gitkeep
 *.log
 .DS_Store
+backend/data/ifa.db-shm
+backend/data/ifa.db-wal

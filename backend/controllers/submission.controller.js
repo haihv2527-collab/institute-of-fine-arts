@@ -1,8 +1,16 @@
 const fs = require("fs");
 const path = require("path");
 const db = require("../config/db");
+const { notifyUser, notifyRole } = require("../realtime/socket");
+const { sendMail, templates } = require("../utils/mailer");
 
 const VALID_MARKS = ["Best", "Better", "Good", "Moderate", "Normal", "Disqualified"];
+
+// Numeric scale used only to average multiple judges' marks into one
+// aggregate bucket. Disqualified is handled separately below (a single
+// disqualifying judge overrides the whole submission — see recomputeAggregate).
+const MARK_POINTS = { Normal: 1, Moderate: 2, Good: 3, Better: 4, Best: 5 };
+const POINT_TO_MARK = { 1: "Normal", 2: "Moderate", 3: "Good", 4: "Better", 5: "Best" };
 
 function getStudentIdForUser(userId) {
   const row = db.prepare("SELECT id FROM students WHERE user_id = ?").get(userId);
@@ -12,6 +20,67 @@ function getStudentIdForUser(userId) {
 function isPastDeadline(competition) {
   const today = new Date().toISOString().slice(0, 10);
   return today > competition.end_date;
+}
+
+/** Full name + email of the student who owns a submission — used for email/socket notifications. */
+function getSubmissionOwner(submissionId) {
+  return db
+    .prepare(
+      `SELECT u.id AS user_id, u.full_name, u.email
+       FROM submissions s
+       JOIN students st ON st.id = s.student_id
+       JOIN users u ON u.id = st.user_id
+       WHERE s.id = ?`
+    )
+    .get(submissionId);
+}
+
+/**
+ * Recalculates a submission's cached mark/remark from every judge_scores
+ * row belonging to it, then writes the result back onto the submissions
+ * table so existing reads (filters, exhibition selection, home page,
+ * etc.) keep working unchanged against a single "mark" column.
+ *
+ * Rule: if ANY judge marked the piece Disqualified, the whole submission
+ * is Disqualified — otherwise the aggregate is the rounded average of
+ * every judge's mark, converted back to the nearest label.
+ */
+function recomputeAggregate(submissionId) {
+  const scores = db
+    .prepare(
+      `SELECT js.mark, js.remark, u.full_name AS judge_name
+       FROM judge_scores js
+       JOIN users u ON u.id = js.judge_id
+       WHERE js.submission_id = ?
+       ORDER BY js.created_at ASC`
+    )
+    .all(submissionId);
+
+  if (scores.length === 0) {
+    db.prepare("UPDATE submissions SET mark = NULL, remark = NULL, marked_by = NULL, marked_at = NULL WHERE id = ?")
+      .run(submissionId);
+    return { mark: null, remark: null };
+  }
+
+  let aggregateMark;
+  if (scores.some((s) => s.mark === "Disqualified")) {
+    aggregateMark = "Disqualified";
+  } else {
+    const avg = scores.reduce((sum, s) => sum + MARK_POINTS[s.mark], 0) / scores.length;
+    const rounded = Math.min(5, Math.max(1, Math.round(avg)));
+    aggregateMark = POINT_TO_MARK[rounded];
+  }
+
+  const combinedRemark = scores
+    .filter((s) => s.remark)
+    .map((s) => `${s.judge_name} (${s.mark}): ${s.remark}`)
+    .join(" | ") || null;
+
+  db.prepare(
+    `UPDATE submissions SET mark = ?, remark = ?, marked_at = datetime('now') WHERE id = ?`
+  ).run(aggregateMark, combinedRemark, submissionId);
+
+  return { mark: aggregateMark, remark: combinedRemark };
 }
 
 // POST /api/submissions  (student only, multipart/form-data with "painting" file)
@@ -52,6 +121,13 @@ function createSubmission(req, res) {
       )
       .run(competition_id, studentId, title || null, req.file.filename, description || null, quote || null);
 
+    // Let every connected staff member know a fresh painting is waiting to be judged.
+    notifyRole("staff", "submission:new", {
+      submissionId: result.lastInsertRowid,
+      competitionTitle: competition.title,
+      studentName: req.user.full_name,
+    });
+
     res.status(201).json({ message: "Painting submitted successfully.", id: result.lastInsertRowid });
   } catch (err) {
     fs.unlink(req.file.path, () => {});
@@ -63,7 +139,8 @@ function createSubmission(req, res) {
 function listSubmissions(req, res) {
   const { competition_id, student_id, mark } = req.query;
   let sql = `
-    SELECT s.*, u.full_name AS student_name, c.title AS competition_title, c.end_date
+    SELECT s.*, u.full_name AS student_name, c.title AS competition_title, c.end_date,
+           (SELECT COUNT(*) FROM judge_scores js WHERE js.submission_id = s.id) AS judge_count
     FROM submissions s
     JOIN students st ON st.id = s.student_id
     JOIN users u ON u.id = st.user_id
@@ -167,25 +244,95 @@ function deleteSubmission(req, res) {
   res.json({ message: "Submission deleted." });
 }
 
-// PATCH /api/submissions/:id/mark  (staff only)
-function markSubmission(req, res) {
+// ----------------------- MULTI-JUDGE SCORING -----------------------
+
+// GET /api/submissions/:id/scores — every judge's individual mark + remark
+function listJudgeScores(req, res) {
+  const submission = db.prepare("SELECT * FROM submissions WHERE id = ?").get(req.params.id);
+  if (!submission) return res.status(404).json({ message: "Submission not found." });
+
+  if (req.user.role === "student" && submission.student_id !== getStudentIdForUser(req.user.id)) {
+    return res.status(403).json({ message: "Access denied." });
+  }
+
+  const scores = db
+    .prepare(
+      `SELECT js.id, js.mark, js.remark, js.created_at, js.updated_at,
+              js.judge_id, u.full_name AS judge_name
+       FROM judge_scores js
+       JOIN users u ON u.id = js.judge_id
+       WHERE js.submission_id = ?
+       ORDER BY js.created_at ASC`
+    )
+    .all(req.params.id);
+
+  res.json({
+    aggregate_mark: submission.mark,
+    judge_count: scores.length,
+    scores,
+  });
+}
+
+// POST /api/submissions/:id/scores  (staff only) — create or update *your own* score
+function upsertJudgeScore(req, res) {
   const { mark, remark } = req.body;
 
   if (!VALID_MARKS.includes(mark)) {
     return res.status(400).json({ message: `mark must be one of: ${VALID_MARKS.join(", ")}` });
   }
 
-  const existing = db.prepare("SELECT * FROM submissions WHERE id = ?").get(req.params.id);
-  if (!existing) return res.status(404).json({ message: "Submission not found." });
+  const submission = db.prepare("SELECT * FROM submissions WHERE id = ?").get(req.params.id);
+  if (!submission) return res.status(404).json({ message: "Submission not found." });
 
   db.prepare(
-    `UPDATE submissions SET mark = ?, remark = ?, marked_by = ?, marked_at = datetime('now') WHERE id = ?`
-  ).run(mark, remark || null, req.user.id, req.params.id);
+    `INSERT INTO judge_scores (submission_id, judge_id, mark, remark)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(submission_id, judge_id)
+     DO UPDATE SET mark = excluded.mark, remark = excluded.remark, updated_at = datetime('now')`
+  ).run(req.params.id, req.user.id, mark, remark || null);
 
-  res.json({ message: "Submission marked." });
+  const { mark: aggregateMark, remark: aggregateRemark } = recomputeAggregate(req.params.id);
+
+  const owner = getSubmissionOwner(req.params.id);
+  if (owner) {
+    notifyUser(owner.user_id, "submission:scored", {
+      submissionId: Number(req.params.id),
+      competitionTitle: submission.competition_title,
+      judgeName: req.user.full_name,
+      mark,
+      remark: remark || null,
+      aggregateMark,
+    });
+
+    const tmpl = templates.submissionScored({
+      studentName: owner.full_name,
+      competitionTitle: db.prepare("SELECT title FROM competitions WHERE id = ?").get(submission.competition_id)?.title || "",
+      judgeName: req.user.full_name,
+      mark,
+      remark,
+      paintingTitle: submission.title,
+    });
+    sendMail({ to: owner.email, ...tmpl });
+  }
+
+  res.json({ message: "Score saved.", aggregate_mark: aggregateMark, aggregate_remark: aggregateRemark });
+}
+
+// DELETE /api/submissions/:id/scores  (staff only) — remove your own score
+function deleteMyJudgeScore(req, res) {
+  const result = db
+    .prepare("DELETE FROM judge_scores WHERE submission_id = ? AND judge_id = ?")
+    .run(req.params.id, req.user.id);
+
+  if (result.changes === 0) return res.status(404).json({ message: "You haven't scored this submission." });
+
+  const { mark: aggregateMark } = recomputeAggregate(req.params.id);
+  res.json({ message: "Your score was removed.", aggregate_mark: aggregateMark });
 }
 
 module.exports = {
   createSubmission, listSubmissions, getSubmission,
-  updateSubmission, deleteSubmission, markSubmission, VALID_MARKS,
+  updateSubmission, deleteSubmission,
+  listJudgeScores, upsertJudgeScore, deleteMyJudgeScore,
+  VALID_MARKS,
 };

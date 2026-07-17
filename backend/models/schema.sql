@@ -109,6 +109,23 @@ CREATE TABLE IF NOT EXISTS exhibition_paintings (
   UNIQUE(exhibition_id, submission_id)
 );
 
+-- JUDGE_SCORES: one row per (submission, judge) — supports a panel of
+-- multiple staff members independently scoring the same painting.
+-- The submission's cached mark/remark columns above are recomputed
+-- automatically from these rows every time one changes (see
+-- submission.controller.js -> recomputeAggregate()).
+CREATE TABLE IF NOT EXISTS judge_scores (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  submission_id  INTEGER NOT NULL REFERENCES submissions(id) ON DELETE CASCADE,
+  judge_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  mark           TEXT NOT NULL CHECK (mark IN ('Best','Better','Good','Moderate','Normal','Disqualified')),
+  remark         TEXT,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(submission_id, judge_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_submissions_competition ON submissions(competition_id);
 CREATE INDEX IF NOT EXISTS idx_submissions_student ON submissions(student_id);
 CREATE INDEX IF NOT EXISTS idx_exhibition_paintings_exhibition ON exhibition_paintings(exhibition_id);
+CREATE INDEX IF NOT EXISTS idx_judge_scores_submission ON judge_scores(submission_id);

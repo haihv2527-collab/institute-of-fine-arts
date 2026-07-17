@@ -1,4 +1,6 @@
 const db = require("../config/db");
+const { notifyUser } = require("../realtime/socket");
+const { sendMail, templates } = require("../utils/mailer");
 
 // GET /api/awards?competition_id=
 function listAwards(req, res) {
@@ -54,6 +56,30 @@ function createAward(req, res) {
        VALUES (?, ?, ?, ?, ?)`
     )
     .run(competition_id, submission_id || null, student_id, award_name, description || null);
+
+  const competition = db.prepare("SELECT title FROM competitions WHERE id = ?").get(competition_id);
+  const winner = db
+    .prepare(
+      `SELECT u.id AS user_id, u.full_name, u.email
+       FROM students st JOIN users u ON u.id = st.user_id
+       WHERE st.id = ?`
+    )
+    .get(student_id);
+
+  if (winner) {
+    notifyUser(winner.user_id, "award:new", {
+      awardId: result.lastInsertRowid,
+      awardName: award_name,
+      competitionTitle: competition?.title,
+    });
+
+    const tmpl = templates.awardGiven({
+      studentName: winner.full_name,
+      competitionTitle: competition?.title || "",
+      awardName: award_name,
+    });
+    sendMail({ to: winner.email, ...tmpl });
+  }
 
   res.status(201).json({ message: "Award created.", id: result.lastInsertRowid });
 }

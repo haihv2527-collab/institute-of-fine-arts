@@ -29,16 +29,46 @@ function submissionCard(s) {
       <h3 style="margin-top:10px;">${escapeHtml(s.title || "Untitled")}</h3>
       <p class="hint">${escapeHtml(s.competition_title)}</p>
       ${s.description ? `<p>${escapeHtml(s.description)}</p>` : ""}
-      ${s.remark ? `<p class="hint"><strong>Teacher's remark:</strong> ${escapeHtml(s.remark)}</p>` : ""}
       <div class="label"><span>Submitted ${fmtDate(s.submitted_at)}</span></div>
-      ${editable ? `
-        <div style="margin-top:12px; display:flex; gap:8px;">
+      <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn secondary small" onclick="openFeedback(${s.id})">View Judges' Feedback</button>
+        ${editable ? `
           <button class="btn secondary small" onclick="openEdit(${s.id})">Edit</button>
           <button class="btn danger small" onclick="removeSubmission(${s.id})">Delete</button>
-        </div>
-      ` : `<p class="hint" style="margin-top:12px;">Deadline passed — no longer editable.</p>`}
+        ` : ""}
+      </div>
+      ${!editable ? `<p class="hint" style="margin-top:8px;">Deadline passed — no longer editable.</p>` : ""}
     </div>
   `;
+}
+
+async function openFeedback(id) {
+  const s = submissions.find((x) => x.id === id);
+  if (!s) return;
+
+  modalShell(`<h2>Judges' Feedback</h2><p class="hint">Loading…</p>`);
+
+  try {
+    const data = await api.get(`/submissions/${id}/scores`);
+    document.querySelector(".modal").innerHTML = `
+      <button class="close-x" onclick="closeModal()">&times;</button>
+      <h2>Judges' Feedback</h2>
+      <p class="hint">${escapeHtml(s.title || "Untitled")} — ${escapeHtml(s.competition_title)}</p>
+      ${data.aggregate_mark
+        ? `<p><span class="tag mark-${data.aggregate_mark}">${data.aggregate_mark} — aggregate of ${data.judge_count} judge${data.judge_count === 1 ? "" : "s"}</span></p>`
+        : `<p class="hint">No judge has scored your painting yet — check back soon.</p>`}
+      ${data.scores.length ? data.scores.map((sc) => `
+        <div class="frame" style="margin-top:12px; padding:14px;">
+          <span class="tag mark-${sc.mark}">${sc.mark}</span>
+          <p style="margin-top:8px; font-weight:600;">${escapeHtml(sc.judge_name)}</p>
+          <p class="hint">${escapeHtml(sc.remark || "No written remark.")}</p>
+        </div>
+      `).join("") : ""}
+    `;
+  } catch (err) {
+    closeModal();
+    toast(err.message, true);
+  }
 }
 
 async function load() {
@@ -87,15 +117,6 @@ function openEdit(id) {
   });
 }
 
-async function removeSubmission(id) {
-  if (!confirm("Delete this submission?")) return;
-  try {
-    await api.del(`/submissions/${id}`);
-    toast("Submission deleted.");
-    load();
-  } catch (err) {
-    toast(err.message, true);
-  }
-}
+window.onRealtimeSubmissionScored = () => load();
 
 load();

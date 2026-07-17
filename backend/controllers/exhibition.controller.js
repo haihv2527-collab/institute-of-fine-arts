@@ -1,4 +1,6 @@
 const db = require("../config/db");
+const { notifyUser } = require("../realtime/socket");
+const { sendMail, templates } = require("../utils/mailer");
 
 function computeStatus(start_date, end_date) {
   const today = new Date().toISOString().slice(0, 10);
@@ -129,6 +131,38 @@ function updateExhibitionPainting(req, res) {
        sold_at = ?
      WHERE id = ?`
   ).run(asking_price, status, sold_price, customer_name, customer_contact, paid_to_student, soldAt, req.params.paintingId);
+
+  const justSold = status === "sold" && existing.status !== "sold";
+  if (justSold) {
+    const info = db
+      .prepare(
+        `SELECT u.id AS user_id, u.full_name, u.email, s.title AS painting_title, e.title AS exhibition_title
+         FROM exhibition_paintings ep
+         JOIN submissions s ON s.id = ep.submission_id
+         JOIN students st ON st.id = s.student_id
+         JOIN users u ON u.id = st.user_id
+         JOIN exhibitions e ON e.id = ep.exhibition_id
+         WHERE ep.id = ?`
+      )
+      .get(req.params.paintingId);
+
+    if (info) {
+      notifyUser(info.user_id, "exhibition:sold", {
+        paintingId: Number(req.params.paintingId),
+        paintingTitle: info.painting_title,
+        exhibitionTitle: info.exhibition_title,
+        soldPrice: sold_price ?? existing.sold_price,
+      });
+
+      const tmpl = templates.paintingSold({
+        studentName: info.full_name,
+        paintingTitle: info.painting_title,
+        exhibitionTitle: info.exhibition_title,
+        soldPrice: sold_price ?? existing.sold_price,
+      });
+      sendMail({ to: info.email, ...tmpl });
+    }
+  }
 
   res.json({ message: "Exhibition painting updated." });
 }

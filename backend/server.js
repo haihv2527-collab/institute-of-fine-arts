@@ -1,10 +1,12 @@
 require("dotenv").config();
 const path = require("path");
+const http = require("http");
 const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
 
 require("./config/db"); // initializes DB + runs schema on boot
+const { initRealtime } = require("./realtime/socket");
 
 const authRoutes = require("./routes/auth.routes");
 const homeRoutes = require("./routes/home.routes");
@@ -17,6 +19,7 @@ const managerRoutes = require("./routes/manager.routes");
 const { UPLOAD_DIR } = require("./middleware/upload.middleware");
 
 const app = express();
+const httpServer = http.createServer(app); // socket.io needs the raw http server, not just the Express app
 
 app.use(cors());
 app.use(express.json());
@@ -59,6 +62,7 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
+initRealtime(httpServer);
+httpServer.listen(PORT, () => {
   console.log(`Institute of Fine Arts API running on http://localhost:${PORT}`);
 });

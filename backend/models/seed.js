@@ -44,6 +44,17 @@ const tx = db.transaction(() => {
       .run(staffUserId, "Watercolor Painting", "Class A, Class B", "2022-09-01");
   }
 
+  // A second judge — multi-judge scoring is only interesting to demo with
+  // more than one staff member scoring the same painting.
+  const staff2UserId = upsertUser({
+    username: "teacher2", password: "teacher123", role: "staff",
+    full_name: "Pham Van Duc", email: "duc.pham@ifa.edu",
+  });
+  if (!db.prepare("SELECT id FROM staffs WHERE user_id = ?").get(staff2UserId)) {
+    db.prepare(`INSERT INTO staffs (user_id, subject, classes, joined_date) VALUES (?, ?, ?, ?)`)
+      .run(staff2UserId, "Oil Painting", "Class A", "2023-01-15");
+  }
+
   const studentUserId = upsertUser({
     username: "student", password: "student123", role: "student",
     full_name: "Tran Minh Anh", email: "minhanh@ifa.edu",
@@ -70,10 +81,11 @@ const tx = db.transaction(() => {
   }
 
   console.log("Seed complete.");
-  console.log("  admin    / admin123");
-  console.log("  manager  / manager123");
-  console.log("  teacher  / teacher123  (staff)");
-  console.log("  student  / student123");
+  console.log("  admin     / admin123");
+  console.log("  manager   / manager123");
+  console.log("  teacher   / teacher123  (staff, judge #1)");
+  console.log("  teacher2  / teacher123  (staff, judge #2)");
+  console.log("  student   / student123");
 });
 
 tx();

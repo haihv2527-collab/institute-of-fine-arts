@@ -36,6 +36,8 @@ function renderHeader(mountId = "site-header") {
 
   const logoutBtn = document.getElementById("logout-btn");
   if (logoutBtn) logoutBtn.addEventListener("click", () => Auth.logout());
+
+  if (typeof connectRealtime === "function") connectRealtime();
 }
 
 const SIDE_LINKS = {
