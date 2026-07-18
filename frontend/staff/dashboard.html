@@ -23,20 +23,20 @@
   async function load() {
     const main = document.getElementById("dash-main-content");
     try {
-      const [competitions, submissions, exhibitions] = await Promise.all([
+      const [competitions, submissionsPage, unmarkedPage, exhibitions] = await Promise.all([
         api.get("/competitions"),
-        api.get("/submissions"),
+        api.get("/submissions?pageSize=1"),
+        api.get("/submissions?unmarked=true&pageSize=1"),
         api.get("/exhibitions"),
       ]);
       const ongoing = competitions.filter((c) => c.status === "ongoing").length;
-      const pending = submissions.filter((s) => !s.mark).length;
 
       main.innerHTML = `
         <div class="stat-cards">
           <div class="stat-card"><div class="num">${competitions.length}</div><div class="cap">Competitions</div></div>
           <div class="stat-card"><div class="num">${ongoing}</div><div class="cap">Ongoing now</div></div>
-          <div class="stat-card"><div class="num">${submissions.length}</div><div class="cap">Total submissions</div></div>
-          <div class="stat-card"><div class="num">${pending}</div><div class="cap">Awaiting a mark</div></div>
+          <div class="stat-card"><div class="num">${submissionsPage.total}</div><div class="cap">Total submissions</div></div>
+          <div class="stat-card"><div class="num">${unmarkedPage.total}</div><div class="cap">Awaiting a mark</div></div>
           <div class="stat-card"><div class="num">${exhibitions.length}</div><div class="cap">Exhibitions</div></div>
         </div>
         <p class="hint">Welcome, ${escapeHtml(user.full_name)}. Start with

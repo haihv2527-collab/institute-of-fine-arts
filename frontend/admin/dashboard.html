@@ -23,15 +23,15 @@
   async function load() {
     const main = document.getElementById("dash-main-content");
     try {
-      const [staff, students] = await Promise.all([
-        api.get("/admin/staff"),
-        api.get("/admin/students"),
+      const [staffPage, studentsPage] = await Promise.all([
+        api.get("/admin/staff?pageSize=1"),
+        api.get("/admin/students?pageSize=1"),
       ]);
 
       main.innerHTML = `
         <div class="stat-cards">
-          <div class="stat-card"><div class="num">${staff.length}</div><div class="cap">Staff accounts</div></div>
-          <div class="stat-card"><div class="num">${students.length}</div><div class="cap">Student accounts</div></div>
+          <div class="stat-card"><div class="num">${staffPage.total}</div><div class="cap">Staff accounts</div></div>
+          <div class="stat-card"><div class="num">${studentsPage.total}</div><div class="cap">Student accounts</div></div>
         </div>
         <p class="hint">Welcome, ${escapeHtml(user.full_name)}. Use the panel on the left to manage staff and
         student accounts — the two account types you're responsible for provisioning. Competitions, marking,

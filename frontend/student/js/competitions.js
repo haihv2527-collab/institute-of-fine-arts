@@ -42,10 +42,12 @@ function competitionCard(c) {
 async function load() {
   const main = document.getElementById("dash-main-content");
   try {
-    [competitions, mySubmissions] = await Promise.all([
+    const [competitionsResult, submissionsResult] = await Promise.all([
       api.get("/competitions"),
-      api.get("/submissions"),
+      api.get("/submissions?pageSize=1000"),
     ]);
+    competitions = competitionsResult;
+    mySubmissions = submissionsResult.data;
     main.innerHTML = `
       <div class="grid">
         ${competitions.length ? competitions.map(competitionCard).join("") : `<div class="empty-state">No competitions available yet.</div>`}

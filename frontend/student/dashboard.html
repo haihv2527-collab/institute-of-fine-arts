@@ -23,18 +23,18 @@
   async function load() {
     const main = document.getElementById("dash-main-content");
     try {
-      const [competitions, submissions, awards] = await Promise.all([
+      const [competitions, submissionsPage, bestPage, awards] = await Promise.all([
         api.get("/competitions?status=ongoing"),
-        api.get("/submissions"),
+        api.get("/submissions?pageSize=1"),
+        api.get("/submissions?mark=Best&pageSize=1"),
         api.get("/awards"),
       ]);
-      const bestCount = submissions.filter((s) => s.mark === "Best").length;
 
       main.innerHTML = `
         <div class="stat-cards">
           <div class="stat-card"><div class="num">${competitions.length}</div><div class="cap">Ongoing competitions</div></div>
-          <div class="stat-card"><div class="num">${submissions.length}</div><div class="cap">My submissions</div></div>
-          <div class="stat-card"><div class="num">${bestCount}</div><div class="cap">Marked "Best"</div></div>
+          <div class="stat-card"><div class="num">${submissionsPage.total}</div><div class="cap">My submissions</div></div>
+          <div class="stat-card"><div class="num">${bestPage.total}</div><div class="cap">Marked "Best"</div></div>
           <div class="stat-card"><div class="num">${awards.length}</div><div class="cap">Awards won</div></div>
         </div>
         <p class="hint">Welcome, ${escapeHtml(user.full_name)}. Browse

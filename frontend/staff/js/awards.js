@@ -32,11 +32,14 @@ function awardRow(a) {
 async function load() {
   const main = document.getElementById("dash-main-content");
   try {
-    [awards, competitions, submissions] = await Promise.all([
+    const [awardsResult, competitionsResult, submissionsResult] = await Promise.all([
       api.get("/awards"),
       api.get("/competitions"),
-      api.get("/submissions", ),
+      api.get("/submissions?pageSize=1000"),
     ]);
+    awards = awardsResult;
+    competitions = competitionsResult;
+    submissions = submissionsResult.data;
 
     main.innerHTML = `
       <div class="toolbar">

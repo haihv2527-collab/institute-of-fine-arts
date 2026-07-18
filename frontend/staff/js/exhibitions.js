@@ -175,11 +175,14 @@ function applyPaintingFilter() {
 async function loadDetail(exhibitionId) {
   const main = document.getElementById("dash-main-content");
   try {
-    [currentExhibition, exhibitionPaintings, allSubmissions] = await Promise.all([
+    const [exhibitionResult, paintingsResult, submissionsResult] = await Promise.all([
       api.get(`/exhibitions/${exhibitionId}`),
       api.get(`/exhibitions/${exhibitionId}/paintings`),
-      api.get(`/submissions`),
+      api.get(`/submissions?pageSize=1000`),
     ]);
+    currentExhibition = exhibitionResult;
+    exhibitionPaintings = paintingsResult;
+    allSubmissions = submissionsResult.data;
 
     const unpaidCount = exhibitionPaintings.filter((p) => p.status === "sold" && !p.paid_to_student).length;
 
