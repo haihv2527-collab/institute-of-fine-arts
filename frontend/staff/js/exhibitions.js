@@ -137,19 +137,21 @@ let exhibitionPaintings = [];
 let allSubmissions = [];
 
 function paintingCard(p) {
+  const unpaid = p.status === "sold" && !p.paid_to_student;
   return `
     <div class="frame">
       <span class="corner tl"></span><span class="corner tr"></span>
       <span class="corner bl"></span><span class="corner br"></span>
       <img class="painting-img" src="${paintingUrl(p.image_path)}" alt="${escapeHtml(p.painting_title || 'Painting')}" />
       <span class="tag ${p.status}">${p.status.replace("_", " ")}</span>
+      ${unpaid ? `<span class="tag sold" style="margin-left:6px;">payment pending</span>` : ""}
       <h3 style="margin-top:10px;">${escapeHtml(p.painting_title || "Untitled")}</h3>
       <p class="hint">by ${escapeHtml(p.student_name)}</p>
       <p class="hint"><strong>Asking price:</strong> ${p.asking_price ?? "—"}</p>
       ${p.status === "sold" ? `
         <p class="hint"><strong>Sold price:</strong> ${p.sold_price ?? "—"}</p>
         <p class="hint"><strong>Buyer:</strong> ${escapeHtml(p.customer_name || "—")} ${p.customer_contact ? `(${escapeHtml(p.customer_contact)})` : ""}</p>
-        <p class="hint"><strong>Paid to student:</strong> ${p.paid_to_student ? "Yes" : "No"}</p>
+        <p class="hint"><strong>Paid to student:</strong> ${p.paid_to_student ? `Yes — ${fmtDate(p.paid_at)}` : "Not yet"}</p>
       ` : ""}
       <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
         <button class="btn secondary small" onclick="openManagePainting(${p.id})">Manage Sale</button>
@@ -157,6 +159,17 @@ function paintingCard(p) {
       </div>
     </div>
   `;
+}
+
+function applyPaintingFilter() {
+  const val = document.getElementById("painting-filter").value;
+  let list = exhibitionPaintings;
+  if (val === "unpaid") list = list.filter((p) => p.status === "sold" && !p.paid_to_student);
+  else if (val) list = list.filter((p) => p.status === val);
+
+  document.getElementById("paintings-grid").innerHTML = list.length
+    ? list.map(paintingCard).join("")
+    : `<div class="empty-state">No paintings match this filter.</div>`;
 }
 
 async function loadDetail(exhibitionId) {
@@ -168,18 +181,32 @@ async function loadDetail(exhibitionId) {
       api.get(`/submissions`),
     ]);
 
+    const unpaidCount = exhibitionPaintings.filter((p) => p.status === "sold" && !p.paid_to_student).length;
+
     main.innerHTML = `
       <p><a href="/staff/exhibitions.html">&larr; Back to all exhibitions</a></p>
       <h2 style="margin-top:6px;">${escapeHtml(currentExhibition.title)} <span class="tag ${currentExhibition.status}">${currentExhibition.status}</span></h2>
       <p class="hint">${fmtDate(currentExhibition.start_date)} → ${fmtDate(currentExhibition.end_date)} · ${escapeHtml(currentExhibition.location || "No location set")}</p>
+      ${unpaidCount ? `<p class="hint" style="color:var(--danger);">⚠ ${unpaidCount} painting${unpaidCount === 1 ? "" : "s"} sold but not yet paid to the student.</p>` : ""}
       <div class="toolbar" style="margin-top:20px;">
-        <span class="hint">${exhibitionPaintings.length} painting(s) in this exhibition</span>
+        <div style="display:flex; gap:12px; align-items:center;">
+          <span class="hint">${exhibitionPaintings.length} painting(s) in this exhibition</span>
+          <select id="painting-filter" style="min-width:190px; margin:0;">
+            <option value="">All paintings</option>
+            <option value="on_display">On display</option>
+            <option value="sold">Sold</option>
+            <option value="unpaid">Sold — payment pending</option>
+            <option value="returned">Returned</option>
+          </select>
+        </div>
         <button class="btn gold" onclick="openAddPainting()">+ Add Painting</button>
       </div>
-      <div class="grid">
+      <div class="grid" id="paintings-grid">
         ${exhibitionPaintings.length ? exhibitionPaintings.map(paintingCard).join("") : `<div class="empty-state">No paintings added yet. Select strong submissions to feature here.</div>`}
       </div>
     `;
+
+    document.getElementById("painting-filter").addEventListener("change", applyPaintingFilter);
   } catch (err) {
     toast(err.message, true);
   }

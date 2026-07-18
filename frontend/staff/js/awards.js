@@ -40,16 +40,30 @@ async function load() {
 
     main.innerHTML = `
       <div class="toolbar">
-        <span class="hint">${awards.length} award(s) given</span>
+        <div style="display:flex; gap:12px; align-items:center;">
+          <span class="hint">${awards.length} award(s) given</span>
+          <select id="award-filter" style="min-width:220px; margin:0;">
+            <option value="">All competitions</option>
+            ${competitions.map((c) => `<option value="${c.id}">${escapeHtml(c.title)}</option>`).join("")}
+          </select>
+        </div>
         <button class="btn gold" onclick="openCreate()">+ Give Award</button>
       </div>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Award</th><th>Student</th><th>Competition</th><th>Notes</th><th>Date</th><th></th></tr></thead>
-          <tbody>${awards.length ? awards.map(awardRow).join("") : `<tr><td colspan="6"><div class="empty-state">No awards yet.</div></td></tr>`}</tbody>
+          <tbody id="awards-tbody">${awards.length ? awards.map(awardRow).join("") : `<tr><td colspan="6"><div class="empty-state">No awards yet.</div></td></tr>`}</tbody>
         </table>
       </div>
     `;
+
+    document.getElementById("award-filter").addEventListener("change", (e) => {
+      const compId = e.target.value;
+      const filtered = compId ? awards.filter((a) => String(a.competition_id) === compId) : awards;
+      document.getElementById("awards-tbody").innerHTML = filtered.length
+        ? filtered.map(awardRow).join("")
+        : `<tr><td colspan="6"><div class="empty-state">No awards for this competition.</div></td></tr>`;
+    });
   } catch (err) {
     toast(err.message, true);
   }

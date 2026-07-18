@@ -105,6 +105,7 @@ CREATE TABLE IF NOT EXISTS exhibition_paintings (
   customer_name     TEXT,
   customer_contact  TEXT,
   paid_to_student   INTEGER NOT NULL DEFAULT 0,
+  paid_at           TEXT,
   sold_at           TEXT,
   UNIQUE(exhibition_id, submission_id)
 );

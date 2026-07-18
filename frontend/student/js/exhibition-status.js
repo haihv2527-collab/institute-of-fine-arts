@@ -14,7 +14,7 @@ function paintingCard(p, exhibitionTitle) {
       <p class="hint"><strong>Asking price:</strong> ${p.asking_price ?? "—"}</p>
       ${p.status === "sold" ? `
         <p class="hint"><strong>Sold price:</strong> ${p.sold_price ?? "—"}</p>
-        <p class="hint"><strong>Payment received:</strong> ${p.paid_to_student ? "Yes" : "Not yet"}</p>
+        <p class="hint"><strong>Payment received:</strong> ${p.paid_to_student ? `Yes — ${fmtDate(p.paid_at)}` : "Not yet"}</p>
       ` : ""}
     </div>
   `;

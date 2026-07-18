@@ -159,12 +159,13 @@ function ensureExhibitionPainting({ exhibitionId, submissionId, askingPrice, sta
     .get(exhibitionId, submissionId);
   if (existing) return existing.id;
   const soldAt = status === "sold" ? new Date().toISOString() : null;
+  const paidAt = paidToStudent ? new Date().toISOString() : null;
   const result = db
     .prepare(
-      `INSERT INTO exhibition_paintings (exhibition_id, submission_id, asking_price, status, sold_price, customer_name, paid_to_student, sold_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO exhibition_paintings (exhibition_id, submission_id, asking_price, status, sold_price, customer_name, paid_to_student, paid_at, sold_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .run(exhibitionId, submissionId, askingPrice, status, soldPrice || null, customerName || null, paidToStudent ? 1 : 0, soldAt);
+    .run(exhibitionId, submissionId, askingPrice, status, soldPrice || null, customerName || null, paidToStudent ? 1 : 0, paidAt, soldAt);
   return result.lastInsertRowid;
 }
 

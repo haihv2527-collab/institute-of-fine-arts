@@ -123,7 +123,10 @@ its row already exists first, so nothing gets duplicated.
 - Create / edit / delete exhibitions
 - Select marked submissions (filterable by mark) to feature in an exhibition
 - Track sale status per exhibited painting: asking price, sold price, buyer
-  info, and whether the student has been paid
+  info, and whether (and exactly when) the student has been paid
+- Filter exhibition paintings by status, or isolate "sold — payment
+  pending" to chase up outstanding payments quickly
+- Filter awards by competition
 
 **Student**
 - Browse ongoing/upcoming competitions
@@ -137,7 +140,8 @@ its row already exists first, so nothing gets duplicated.
 **Manager**
 - Dashboard with system-wide counts
 - Reports: all "Best"-marked submissions, every staff remark (for
-  oversight), and all completed exhibition sales
+  oversight), and all completed exhibition sales — best-submissions and
+  remarks filterable by competition, sales filterable to unpaid-only
 
 ## Extended features
 

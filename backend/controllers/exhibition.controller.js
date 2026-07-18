@@ -119,6 +119,8 @@ function updateExhibitionPainting(req, res) {
   if (!existing) return res.status(404).json({ message: "Exhibition painting not found." });
 
   const soldAt = status === "sold" && existing.status !== "sold" ? new Date().toISOString() : existing.sold_at;
+  const justPaid = paid_to_student === 1 && !existing.paid_to_student;
+  const paidAt = justPaid ? new Date().toISOString() : existing.paid_at;
 
   db.prepare(
     `UPDATE exhibition_paintings SET
@@ -128,9 +130,10 @@ function updateExhibitionPainting(req, res) {
        customer_name = COALESCE(?, customer_name),
        customer_contact = COALESCE(?, customer_contact),
        paid_to_student = COALESCE(?, paid_to_student),
+       paid_at = ?,
        sold_at = ?
      WHERE id = ?`
-  ).run(asking_price, status, sold_price, customer_name, customer_contact, paid_to_student, soldAt, req.params.paintingId);
+  ).run(asking_price ?? null, status ?? null, sold_price ?? null, customer_name ?? null, customer_contact ?? null, paid_to_student ?? null, paidAt, soldAt, req.params.paintingId);
 
   const justSold = status === "sold" && existing.status !== "sold";
   if (justSold) {
