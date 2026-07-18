@@ -1,9 +1,13 @@
 node_modules/
 backend/.env
-# backend/data/
+backend/data/
 backend/uploads/submissions/*
 !backend/uploads/submissions/.gitkeep
 *.log
 .DS_Store
-backend/data/ifa.db-shm
-backend/data/ifa.db-wal
+
+# backend/seed-assets/ is intentionally NOT ignored — these are small
+# placeholder painting images shipped with the repo so `npm run seed`
+# can create realistic-looking sample submissions out of the box.
+# They are copied into uploads/submissions/ at seed time, not edited
+# directly, so they're safe to keep in git unlike real user uploads.
