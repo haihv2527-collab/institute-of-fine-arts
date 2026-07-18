@@ -136,38 +136,60 @@ function createSubmission(req, res) {
 }
 
 // GET /api/submissions?competition_id=&student_id=&mark=
+// GET /api/submissions?competition_id=&student_id=&mark=&unmarked=&unscored_by_me=&page=&pageSize=
 function listSubmissions(req, res) {
-  const { competition_id, student_id, mark } = req.query;
-  let sql = `
-    SELECT s.*, u.full_name AS student_name, c.title AS competition_title, c.end_date,
-           (SELECT COUNT(*) FROM judge_scores js WHERE js.submission_id = s.id) AS judge_count
-    FROM submissions s
-    JOIN students st ON st.id = s.student_id
-    JOIN users u ON u.id = st.user_id
-    JOIN competitions c ON c.id = s.competition_id
-    WHERE 1 = 1`;
+  const { competition_id, student_id, mark, unmarked, unscored_by_me } = req.query;
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(50, Math.max(1, Number(req.query.pageSize) || 12));
+
+  let where = " WHERE 1 = 1";
   const params = [];
 
   // Students may only see their own submissions
   if (req.user.role === "student") {
-    sql += " AND s.student_id = ?";
+    where += " AND s.student_id = ?";
     params.push(getStudentIdForUser(req.user.id));
   } else if (student_id) {
-    sql += " AND s.student_id = ?";
+    where += " AND s.student_id = ?";
     params.push(student_id);
   }
 
   if (competition_id) {
-    sql += " AND s.competition_id = ?";
+    where += " AND s.competition_id = ?";
     params.push(competition_id);
   }
-  if (mark) {
-    sql += " AND s.mark = ?";
+  if (unmarked === "true") {
+    where += " AND s.mark IS NULL";
+  } else if (mark) {
+    where += " AND s.mark = ?";
     params.push(mark);
   }
+  if (unscored_by_me === "true" && req.user.role === "staff") {
+    where += " AND NOT EXISTS (SELECT 1 FROM judge_scores js2 WHERE js2.submission_id = s.id AND js2.judge_id = ?)";
+    params.push(req.user.id);
+  }
 
-  sql += " ORDER BY s.submitted_at DESC";
-  res.json(db.prepare(sql).all(...params));
+  const baseFrom = `
+    FROM submissions s
+    JOIN students st ON st.id = s.student_id
+    JOIN users u ON u.id = st.user_id
+    JOIN competitions c ON c.id = s.competition_id`;
+
+  const total = db.prepare(`SELECT COUNT(*) AS n ${baseFrom}${where}`).get(...params).n;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const offset = (page - 1) * pageSize;
+
+  const data = db
+    .prepare(
+      `SELECT s.*, u.full_name AS student_name, c.title AS competition_title, c.end_date,
+              (SELECT COUNT(*) FROM judge_scores js WHERE js.submission_id = s.id) AS judge_count
+       ${baseFrom}${where}
+       ORDER BY s.submitted_at DESC
+       LIMIT ? OFFSET ?`
+    )
+    .all(...params, pageSize, offset);
+
+  res.json({ data, page, pageSize, total, totalPages });
 }
 
 // GET /api/submissions/:id

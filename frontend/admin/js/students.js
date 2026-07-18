@@ -3,6 +3,9 @@ renderHeader();
 renderDashShell({ role: "admin", active: "/admin/students.html", title: "Student Accounts" });
 
 let allStudents = [];
+let currentPage = 1;
+let currentSearch = "";
+const PAGE_SIZE = 8;
 
 function studentRow(s) {
   return `
@@ -21,38 +24,44 @@ function studentRow(s) {
   `;
 }
 
-function renderTable(list) {
+function renderShell() {
   const main = document.getElementById("dash-main-content");
   main.innerHTML = `
     <div class="toolbar">
-      <input type="search" id="search" placeholder="Search by name, email, username..." />
+      <input type="search" id="search" placeholder="Search by name, email, username..." value="${escapeHtml(currentSearch)}" />
       <button class="btn gold" onclick="openCreate()">+ Add Student</button>
     </div>
     <div class="table-wrap">
       <table>
         <thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Admission No.</th><th>Class</th><th>Status</th><th></th></tr></thead>
-        <tbody id="student-tbody">
-          ${list.length ? list.map(studentRow).join("") : `<tr><td colspan="7"><div class="empty-state">No student accounts yet.</div></td></tr>`}
-        </tbody>
+        <tbody id="student-tbody"></tbody>
       </table>
     </div>
+    <div id="student-pager"></div>
   `;
 
+  let debounceTimer;
   document.getElementById("search").addEventListener("input", (e) => {
-    const q = e.target.value.toLowerCase();
-    const filtered = allStudents.filter((s) =>
-      [s.full_name, s.email, s.username].some((f) => (f || "").toLowerCase().includes(q))
-    );
-    document.getElementById("student-tbody").innerHTML = filtered.length
-      ? filtered.map(studentRow).join("")
-      : `<tr><td colspan="7"><div class="empty-state">No matches.</div></td></tr>`;
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      currentSearch = e.target.value;
+      loadStudents(1);
+    }, 250);
   });
 }
 
-async function loadStudents() {
+async function loadStudents(page = 1) {
+  currentPage = page;
   try {
-    allStudents = await api.get("/admin/students");
-    renderTable(allStudents);
+    const params = new URLSearchParams({ page, pageSize: PAGE_SIZE });
+    if (currentSearch) params.set("search", currentSearch);
+    const result = await api.get(`/admin/students?${params.toString()}`);
+    allStudents = result.data;
+
+    document.getElementById("student-tbody").innerHTML = allStudents.length
+      ? allStudents.map(studentRow).join("")
+      : `<tr><td colspan="7"><div class="empty-state">No student accounts found.</div></td></tr>`;
+    renderPager("student-pager", result, loadStudents);
   } catch (err) {
     toast(err.message, true);
   }
@@ -114,7 +123,7 @@ function openCreate() {
       await api.post("/admin/students", payload);
       toast("Student account created.");
       closeModal();
-      loadStudents();
+      loadStudents(currentPage);
     } catch (err) {
       toast(err.message, true);
     }
@@ -163,7 +172,7 @@ function openEdit(id) {
       await api.put(`/admin/students/${id}`, payload);
       toast("Student account updated.");
       closeModal();
-      loadStudents();
+      loadStudents(currentPage);
     } catch (err) {
       toast(err.message, true);
     }
@@ -175,10 +184,11 @@ async function removeStudent(id) {
   try {
     await api.del(`/admin/students/${id}`);
     toast("Student account deleted.");
-    loadStudents();
+    loadStudents(currentPage);
   } catch (err) {
     toast(err.message, true);
   }
 }
 
+renderShell();
 loadStudents();

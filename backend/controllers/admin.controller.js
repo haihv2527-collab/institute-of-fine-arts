@@ -6,16 +6,28 @@ const db = require("../config/db");
 // GET /api/admin/staff?search=
 function listStaff(req, res) {
   const search = `%${req.query.search || ""}%`;
-  const rows = db
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(50, Math.max(1, Number(req.query.pageSize) || 8));
+  const offset = (page - 1) * pageSize;
+
+  const whereClause = `WHERE u.role = 'staff' AND (u.full_name LIKE ? OR u.email LIKE ? OR u.username LIKE ?)`;
+  const total = db
+    .prepare(`SELECT COUNT(*) AS n FROM users u JOIN staffs s ON s.user_id = u.id ${whereClause}`)
+    .get(search, search, search).n;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  const data = db
     .prepare(
       `SELECT u.id, u.username, u.full_name, u.email, u.phone, u.is_active,
               s.id AS staff_id, s.subject, s.classes, s.joined_date
        FROM users u JOIN staffs s ON s.user_id = u.id
-       WHERE u.role = 'staff' AND (u.full_name LIKE ? OR u.email LIKE ? OR u.username LIKE ?)
-       ORDER BY u.full_name`
+       ${whereClause}
+       ORDER BY u.full_name
+       LIMIT ? OFFSET ?`
     )
-    .all(search, search, search);
-  res.json(rows);
+    .all(search, search, search, pageSize, offset);
+
+  res.json({ data, page, pageSize, total, totalPages });
 }
 
 // POST /api/admin/staff
@@ -83,17 +95,29 @@ function deleteStaff(req, res) {
 // GET /api/admin/students?search=
 function listStudents(req, res) {
   const search = `%${req.query.search || ""}%`;
-  const rows = db
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(50, Math.max(1, Number(req.query.pageSize) || 8));
+  const offset = (page - 1) * pageSize;
+
+  const whereClause = `WHERE u.role = 'student' AND (u.full_name LIKE ? OR u.email LIKE ? OR u.username LIKE ?)`;
+  const total = db
+    .prepare(`SELECT COUNT(*) AS n FROM users u JOIN students st ON st.user_id = u.id ${whereClause}`)
+    .get(search, search, search).n;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  const data = db
     .prepare(
       `SELECT u.id, u.username, u.full_name, u.email, u.phone, u.is_active,
               st.id AS student_id, st.admission_no, st.admission_date, st.date_of_birth,
               st.address, st.guardian_name, st.guardian_phone, st.class_name
        FROM users u JOIN students st ON st.user_id = u.id
-       WHERE u.role = 'student' AND (u.full_name LIKE ? OR u.email LIKE ? OR u.username LIKE ?)
-       ORDER BY u.full_name`
+       ${whereClause}
+       ORDER BY u.full_name
+       LIMIT ? OFFSET ?`
     )
-    .all(search, search, search);
-  res.json(rows);
+    .all(search, search, search, pageSize, offset);
+
+  res.json({ data, page, pageSize, total, totalPages });
 }
 
 // POST /api/admin/students

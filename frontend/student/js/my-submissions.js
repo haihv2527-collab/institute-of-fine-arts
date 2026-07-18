@@ -71,15 +71,22 @@ async function openFeedback(id) {
   }
 }
 
-async function load() {
+let currentPage = 1;
+const PAGE_SIZE = 6;
+
+async function load(page = 1) {
+  currentPage = page;
   const main = document.getElementById("dash-main-content");
   try {
-    submissions = await api.get("/submissions");
+    const result = await api.get(`/submissions?page=${page}&pageSize=${PAGE_SIZE}`);
+    submissions = result.data;
     main.innerHTML = `
       <div class="grid">
         ${submissions.length ? submissions.map(submissionCard).join("") : `<div class="empty-state">You haven't submitted any paintings yet. Visit <a href="/student/competitions.html">Competitions</a> to enter one.</div>`}
       </div>
+      <div id="my-sub-pager"></div>
     `;
+    renderPager("my-sub-pager", result, load);
   } catch (err) {
     toast(err.message, true);
   }
@@ -110,13 +117,24 @@ function openEdit(id) {
       await api.put(`/submissions/${id}`, fd, true);
       toast("Submission updated.");
       closeModal();
-      load();
+      load(currentPage);
     } catch (err) {
       toast(err.message, true);
     }
   });
 }
 
-window.onRealtimeSubmissionScored = () => load();
+async function removeSubmission(id) {
+  if (!confirm("Delete this submission?")) return;
+  try {
+    await api.del(`/submissions/${id}`);
+    toast("Submission deleted.");
+    load(currentPage);
+  } catch (err) {
+    toast(err.message, true);
+  }
+}
+
+window.onRealtimeSubmissionScored = () => load(currentPage);
 
 load();

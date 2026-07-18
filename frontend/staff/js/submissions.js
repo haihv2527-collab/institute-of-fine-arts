@@ -3,8 +3,10 @@ renderHeader();
 renderDashShell({ role: "staff", active: "/staff/submissions.html", title: "Judge Submissions" });
 
 const MARKS = ["Best", "Better", "Good", "Moderate", "Normal", "Disqualified"];
+const PAGE_SIZE = 6; // small on purpose so pagination is visible with the seeded demo data
 let competitions = [];
-let submissions = [];
+let currentPage = 1;
+let lastKnownSubmissions = []; // cache of the current page's rows, used by the score modal
 
 function modalShell(innerHtml) {
   const wrap = document.createElement("div");
@@ -33,22 +35,41 @@ function submissionCard(s) {
   `;
 }
 
-function renderGrid(list) {
-  document.getElementById("sub-grid").innerHTML = list.length
-    ? list.map(submissionCard).join("")
-    : `<div class="empty-state">No submissions match this filter.</div>`;
+function currentFilters() {
+  return {
+    competition_id: document.getElementById("filter-competition")?.value || "",
+    mark: document.getElementById("filter-mark")?.value || "",
+  };
+}
+
+async function fetchAndRender(page = 1) {
+  currentPage = page;
+  const { competition_id, mark } = currentFilters();
+  const params = new URLSearchParams({ page, pageSize: PAGE_SIZE });
+  if (competition_id) params.set("competition_id", competition_id);
+  if (mark === "__unmarked") params.set("unmarked", "true");
+  else if (mark === "__unscored_by_me") params.set("unscored_by_me", "true");
+  else if (mark) params.set("mark", mark);
+
+  try {
+    const result = await api.get(`/submissions?${params.toString()}`);
+    lastKnownSubmissions = result.data;
+    document.getElementById("sub-grid").innerHTML = result.data.length
+      ? result.data.map(submissionCard).join("")
+      : `<div class="empty-state">No submissions match this filter.</div>`;
+    renderPager("sub-pager", result, fetchAndRender);
+  } catch (err) {
+    toast(err.message, true);
+  }
 }
 
 async function load() {
   const main = document.getElementById("dash-main-content");
   try {
-    [competitions, submissions] = await Promise.all([
-      api.get("/competitions"),
-      api.get("/submissions"),
-    ]);
+    competitions = await api.get("/competitions");
 
     main.innerHTML = `
-      <p class="hint">Each staff member scores independently — the tag on a card shows the <strong>aggregate</strong> of every judge so far (average mark, or "Disqualified" if any judge flags it).</p>
+      <p class="hint">Each staff member scores independently — the tag on a card shows the <strong>aggregate</strong> of every judge so far (average mark, or "Disqualified" if any judge flags it). Filtering and pagination both happen on the server, so this stays fast no matter how many submissions pile up over the years.</p>
       <div class="toolbar">
         <div class="field-row" style="gap:12px; display:flex;">
           <select id="filter-competition" style="min-width:220px; margin:0;">
@@ -64,38 +85,20 @@ async function load() {
         </div>
       </div>
       <div class="grid" id="sub-grid"></div>
+      <div id="sub-pager"></div>
     `;
-    renderGrid(submissions);
 
-    document.getElementById("filter-competition").addEventListener("change", applyFilters);
-    document.getElementById("filter-mark").addEventListener("change", applyFilters);
+    document.getElementById("filter-competition").addEventListener("change", () => fetchAndRender(1));
+    document.getElementById("filter-mark").addEventListener("change", () => fetchAndRender(1));
+
+    await fetchAndRender(1);
   } catch (err) {
     toast(err.message, true);
   }
 }
 
-function applyFilters() {
-  const compId = document.getElementById("filter-competition").value;
-  const mark = document.getElementById("filter-mark").value;
-  let list = submissions;
-  if (compId) list = list.filter((s) => String(s.competition_id) === compId);
-  if (mark === "__unmarked") list = list.filter((s) => !s.mark);
-  else if (mark && mark !== "__unscored_by_me") list = list.filter((s) => s.mark === mark);
-  renderGrid(list);
-
-  if (mark === "__unscored_by_me") {
-    // Needs the per-submission judge list, so resolve async then re-render just this filtered view.
-    Promise.all(list.map((s) => api.get(`/submissions/${s.id}/scores`)))
-      .then((results) => {
-        const filtered = list.filter((s, i) => !results[i].scores.some((sc) => sc.judge_id === currentUser.id));
-        renderGrid(filtered);
-      })
-      .catch((err) => toast(err.message, true));
-  }
-}
-
 async function openScores(id) {
-  const s = submissions.find((x) => x.id === id);
+  const s = lastKnownSubmissions.find((x) => x.id === id);
   if (!s) return;
 
   modalShell(`<h2>Judging: ${escapeHtml(s.title || "Untitled")}</h2><p class="hint">Loading scores…</p>`);
@@ -143,7 +146,7 @@ async function openScores(id) {
         await api.post(`/submissions/${id}/scores`, payload);
         toast("Your score was saved.");
         closeModal();
-        load();
+        fetchAndRender(currentPage);
       } catch (err) {
         toast(err.message, true);
       }
@@ -154,7 +157,7 @@ async function openScores(id) {
   }
 }
 
-// Live-refresh the grid whenever a new submission comes in while this page is open.
-window.onRealtimeNewSubmission = () => load();
+// Live-refresh the current page whenever a new submission comes in while this page is open.
+window.onRealtimeNewSubmission = () => fetchAndRender(currentPage);
 
 load();

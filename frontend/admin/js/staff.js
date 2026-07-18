@@ -3,6 +3,9 @@ renderHeader();
 renderDashShell({ role: "admin", active: "/admin/staff.html", title: "Staff Accounts" });
 
 let allStaff = [];
+let currentPage = 1;
+let currentSearch = "";
+const PAGE_SIZE = 8;
 
 function staffRow(s) {
   return `
@@ -21,38 +24,44 @@ function staffRow(s) {
   `;
 }
 
-function renderTable(list) {
+function renderShell() {
   const main = document.getElementById("dash-main-content");
   main.innerHTML = `
     <div class="toolbar">
-      <input type="search" id="search" placeholder="Search by name, email, username..." />
+      <input type="search" id="search" placeholder="Search by name, email, username..." value="${escapeHtml(currentSearch)}" />
       <button class="btn gold" onclick="openCreate()">+ Add Staff</button>
     </div>
     <div class="table-wrap">
       <table>
         <thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Subject</th><th>Classes</th><th>Status</th><th></th></tr></thead>
-        <tbody id="staff-tbody">
-          ${list.length ? list.map(staffRow).join("") : `<tr><td colspan="7"><div class="empty-state">No staff accounts yet.</div></td></tr>`}
-        </tbody>
+        <tbody id="staff-tbody"></tbody>
       </table>
     </div>
+    <div id="staff-pager"></div>
   `;
 
+  let debounceTimer;
   document.getElementById("search").addEventListener("input", (e) => {
-    const q = e.target.value.toLowerCase();
-    const filtered = allStaff.filter((s) =>
-      [s.full_name, s.email, s.username].some((f) => (f || "").toLowerCase().includes(q))
-    );
-    document.getElementById("staff-tbody").innerHTML = filtered.length
-      ? filtered.map(staffRow).join("")
-      : `<tr><td colspan="7"><div class="empty-state">No matches.</div></td></tr>`;
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      currentSearch = e.target.value;
+      loadStaff(1);
+    }, 250);
   });
 }
 
-async function loadStaff() {
+async function loadStaff(page = 1) {
+  currentPage = page;
   try {
-    allStaff = await api.get("/admin/staff");
-    renderTable(allStaff);
+    const params = new URLSearchParams({ page, pageSize: PAGE_SIZE });
+    if (currentSearch) params.set("search", currentSearch);
+    const result = await api.get(`/admin/staff?${params.toString()}`);
+    allStaff = result.data;
+
+    document.getElementById("staff-tbody").innerHTML = allStaff.length
+      ? allStaff.map(staffRow).join("")
+      : `<tr><td colspan="7"><div class="empty-state">No staff accounts found.</div></td></tr>`;
+    renderPager("staff-pager", result, loadStaff);
   } catch (err) {
     toast(err.message, true);
   }
@@ -104,7 +113,7 @@ function openCreate() {
       await api.post("/admin/staff", payload);
       toast("Staff account created.");
       closeModal();
-      loadStaff();
+      loadStaff(currentPage);
     } catch (err) {
       toast(err.message, true);
     }
@@ -147,7 +156,7 @@ function openEdit(id) {
       await api.put(`/admin/staff/${id}`, payload);
       toast("Staff account updated.");
       closeModal();
-      loadStaff();
+      loadStaff(currentPage);
     } catch (err) {
       toast(err.message, true);
     }
@@ -159,10 +168,11 @@ async function removeStaff(id) {
   try {
     await api.del(`/admin/staff/${id}`);
     toast("Staff account deleted.");
-    loadStaff();
+    loadStaff(currentPage);
   } catch (err) {
     toast(err.message, true);
   }
 }
 
+renderShell();
 loadStaff();

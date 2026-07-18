@@ -33,6 +33,7 @@ institute-of-fine-arts/
     ├── css/style.css          Design system (shared by every page)
     ├── js/api.js              Fetch wrapper + auth/session helpers
     ├── js/layout.js           Shared header + dashboard sidebar renderer
+    ├── js/pagination.js       Shared Prev/Next pager for paginated list pages
     ├── js/realtime.js         Socket.io client — connects once logged in, shows toasts
     ├── js/vendor/socket.io.min.js  Self-hosted client library (no external CDN needed)
     ├── js/home.js
@@ -112,13 +113,16 @@ its row already exists first, so nothing gets duplicated.
 **Administrator**
 - Full CRUD for Staff accounts (subject, classes, contact info)
 - Full CRUD for Student accounts (admission info, guardian info, class)
-- Search across both
+- Search across both — filtered and paginated on the server, not just
+  hidden/shown after fetching every account
 
 **Staff (Teacher)**
 - Create / edit / delete competitions (dates, conditions, prize)
 - View every submission with painting, description, and quote/poem
 - Score submissions as part of a judging panel — see "Multi-judge scoring" below
-- Filter submissions by competition, by mark, or by "not yet scored by me"
+- Filter submissions by competition, by mark, or by "not yet scored by
+  me" — filtered and paginated on the server, so this stays fast as
+  submissions accumulate over multiple school years
 - Give awards, linked to a competition and optionally a specific submission
 - Create / edit / delete exhibitions
 - Select marked submissions (filterable by mark) to feature in an exhibition
@@ -217,6 +221,32 @@ real email, fill in `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS`
 in `.env` — see the comments in `.env.example` for a Gmail App Password
 example.
 
+### 4. Server-side filtering + pagination
+
+Submission, staff, and student lists — the ones that grow every term —
+are filtered and paginated **on the server**, not just hidden/shown in
+the browser after fetching everything. This matters at real scale: with
+thousands of submissions across many years, fetching the full table on
+every page load would only get slower over time regardless of how the UI
+filters it afterwards.
+
+- `GET /api/submissions` accepts `competition_id`, `mark`, `unmarked=true`,
+  `unscored_by_me=true` (staff only — submissions the requesting judge
+  hasn't scored yet), plus `page`/`pageSize`. The database does the
+  filtering via `WHERE` clauses and the paging via `LIMIT`/`OFFSET`; only
+  the requested page of already-matching rows is ever sent over the wire.
+- `GET /api/admin/staff` and `GET /api/admin/students` accept `search`
+  (matches name/email/username) plus `page`/`pageSize`, the same way —
+  typing in the search box re-queries the server instead of filtering
+  rows already sitting in the browser.
+- All three endpoints return `{ data, page, pageSize, total, totalPages }`
+  instead of a bare array. `frontend/js/pagination.js` is a small shared
+  `renderPager()` helper that turns that shape into Prev/Next controls
+  and is reused across every paginated page.
+- The demo page size is deliberately small (6 for submissions, 8 for
+  staff/students) so pagination is visible immediately with the seeded
+  seed data, rather than requiring hundreds of rows to notice it at all.
+
 ## Technical notes
 
 - **Auth**: JWT-based. Token stored in `localStorage`, sent as
@@ -241,12 +271,11 @@ example.
 ## Suggested next steps for a developer picking this up
 
 1. Add password-reset / "first login must change password" flow.
-2. Add pagination to submission and student/staff lists once data grows.
-3. Add automated tests for the controllers (the RBAC + deadline logic in
+2. Add automated tests for the controllers (the RBAC + deadline logic in
    particular is worth locking down with tests, and the judge-score
    aggregation math is a great unit-test candidate).
-4. Move file storage to S3 or similar if deploying beyond a single server.
-5. If deploying with multiple backend instances behind a load balancer,
+3. Move file storage to S3 or similar if deploying beyond a single server.
+4. If deploying with multiple backend instances behind a load balancer,
    swap Socket.io's default in-memory adapter for the Redis adapter
    (`@socket.io/redis-adapter`) so realtime events reach a user regardless
    of which instance their socket connected to.
