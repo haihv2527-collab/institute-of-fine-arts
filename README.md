@@ -91,7 +91,7 @@ them use the password `student123`:
 | Nguyen Thi Lan    | `lan.nguyen` | Class A | IFA-2024-002   |
 | Le Van Hung       | `hung.le`    | Class A | IFA-2024-003   |
 | Pham Thi Mai      | `mai.pham`   | Class B | IFA-2024-004   |
-| Hoang Van Nam     | `nam.hoang`  | Class B | IFA-2024-005   |
+| Hoang Van Nam     | `nam.hoang`  | Class B | IFupA-2024-005   |
 | Vu Thi Huong      | `huong.vu`   | Class B | IFA-2024-006   |
 | Dang Van Tuan     | `tuan.dang`  | Class C | IFA-2024-007   |
 | Bui Thi Ngoc      | `ngoc.bui`   | Class C | IFA-2024-008   |

@@ -5,7 +5,7 @@ renderDashShell({ role: "admin", active: "/admin/staff.html", title: "Staff Acco
 let allStaff = [];
 let currentPage = 1;
 let currentSearch = "";
-const PAGE_SIZE = 3;
+const PAGE_SIZE = 8;
 
 function staffRow(s) {
   return `
@@ -18,6 +18,7 @@ function staffRow(s) {
       <td>${s.is_active ? '<span class="tag ongoing">active</span>' : '<span class="tag closed">disabled</span>'}</td>
       <td style="white-space:nowrap;">
         <button class="btn secondary small" onclick="openEdit(${s.id})">Edit</button>
+        <button class="btn secondary small" onclick="openResetPassword(${s.id})">Reset Password</button>
         <button class="btn danger small" onclick="removeStaff(${s.id})">Delete</button>
       </td>
     </tr>
@@ -157,6 +158,33 @@ function openEdit(id) {
       toast("Staff account updated.");
       closeModal();
       loadStaff(currentPage);
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+}
+
+function openResetPassword(id) {
+  const s = allStaff.find((x) => x.id === id);
+  if (!s) return;
+  modalShell(`
+    <h2>Reset Password</h2>
+    <p class="hint">Setting a new password for <strong>${escapeHtml(s.full_name)}</strong> (${escapeHtml(s.username)}).
+    They will need to use this new password on their next sign-in — there is no way to view their current password.</p>
+    <form id="reset-password-form">
+      <label>New password</label>
+      <input name="password" type="text" required placeholder="Min. 6 characters" />
+      <button class="btn gold" type="submit" style="width:100%; justify-content:center;">Set new password</button>
+    </form>
+  `);
+
+  document.getElementById("reset-password-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const payload = Object.fromEntries(new FormData(e.target).entries());
+    try {
+      await api.patch(`/admin/staff/${id}/password`, payload);
+      toast("Password reset successfully.");
+      closeModal();
     } catch (err) {
       toast(err.message, true);
     }

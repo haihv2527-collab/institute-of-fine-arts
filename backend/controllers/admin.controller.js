@@ -90,6 +90,23 @@ function deleteStaff(req, res) {
   res.json({ message: "Staff account deleted." });
 }
 
+// PATCH /api/admin/staff/:id/password — admin sets a brand new password.
+// Note: there is no way to *view* an existing password — it's stored as
+// a one-way bcrypt hash, by design, so only resetting to a new value is
+// possible, never reading the old one back out.
+function resetStaffPassword(req, res) {
+  const { password } = req.body;
+  if (!password || password.length < 6) {
+    return res.status(400).json({ message: "Password must be at least 6 characters." });
+  }
+  const hash = bcrypt.hashSync(password, 10);
+  const result = db
+    .prepare("UPDATE users SET password_hash = ? WHERE id = ? AND role = 'staff'")
+    .run(hash, req.params.id);
+  if (result.changes === 0) return res.status(404).json({ message: "Staff not found." });
+  res.json({ message: "Password reset successfully." });
+}
+
 // ----------------------- STUDENT -----------------------
 
 // GET /api/admin/students?search=
@@ -195,7 +212,21 @@ function deleteStudent(req, res) {
   res.json({ message: "Student account deleted." });
 }
 
+// PATCH /api/admin/students/:id/password — admin sets a brand new password.
+function resetStudentPassword(req, res) {
+  const { password } = req.body;
+  if (!password || password.length < 6) {
+    return res.status(400).json({ message: "Password must be at least 6 characters." });
+  }
+  const hash = bcrypt.hashSync(password, 10);
+  const result = db
+    .prepare("UPDATE users SET password_hash = ? WHERE id = ? AND role = 'student'")
+    .run(hash, req.params.id);
+  if (result.changes === 0) return res.status(404).json({ message: "Student not found." });
+  res.json({ message: "Password reset successfully." });
+}
+
 module.exports = {
-  listStaff, createStaff, updateStaff, deleteStaff,
-  listStudents, createStudent, updateStudent, deleteStudent,
+  listStaff, createStaff, updateStaff, deleteStaff, resetStaffPassword,
+  listStudents, createStudent, updateStudent, deleteStudent, resetStudentPassword,
 };
