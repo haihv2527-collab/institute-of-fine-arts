@@ -5,7 +5,7 @@ renderDashShell({ role: "admin", active: "/admin/students.html", title: "Student
 let allStudents = [];
 let currentPage = 1;
 let currentSearch = "";
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 3;
 
 function studentRow(s) {
   return `

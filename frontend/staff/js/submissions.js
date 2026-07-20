@@ -3,7 +3,7 @@ renderHeader();
 renderDashShell({ role: "staff", active: "/staff/submissions.html", title: "Judge Submissions" });
 
 const MARKS = ["Best", "Better", "Good", "Moderate", "Normal", "Disqualified"];
-const PAGE_SIZE = 6; // small on purpose so pagination is visible with the seeded demo data
+const PAGE_SIZE = 3; // small on purpose so pagination is visible with the seeded demo data
 let competitions = [];
 let currentPage = 1;
 let lastKnownSubmissions = []; // cache of the current page's rows, used by the score modal

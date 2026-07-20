@@ -5,7 +5,7 @@ renderDashShell({ role: "admin", active: "/admin/staff.html", title: "Staff Acco
 let allStaff = [];
 let currentPage = 1;
 let currentSearch = "";
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 3;
 
 function staffRow(s) {
   return `

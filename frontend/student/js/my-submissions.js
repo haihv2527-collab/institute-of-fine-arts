@@ -72,7 +72,7 @@ async function openFeedback(id) {
 }
 
 let currentPage = 1;
-const PAGE_SIZE = 6;
+const PAGE_SIZE = 3;
 
 async function load(page = 1) {
   currentPage = page;

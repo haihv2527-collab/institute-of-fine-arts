@@ -81,11 +81,24 @@ Two staff accounts are seeded on purpose — multi-judge scoring (below) is
 only interesting to try out with more than one judge scoring the same
 painting.
 
-The seed script also creates **9 more student accounts** (username /
-`student123`, e.g. `lan.nguyen`, `hung.le`, `mai.pham`... — see
-`backend/models/seed.js` for the full list, or check Admin → Student
-Accounts after seeding) so lists, filters, and reports aren't staring at
-empty/near-empty tables. In total, seeding creates:
+The seed script also creates **9 more student accounts** so lists,
+filters, and reports aren't staring at empty/near-empty tables. All of
+them use the password `student123`:
+
+| Full name        | Username     | Class   | Admission No. |
+|-------------------|--------------|---------|----------------|
+| Tran Minh Anh     | `student`    | Class A | IFA-2024-001   |
+| Nguyen Thi Lan    | `lan.nguyen` | Class A | IFA-2024-002   |
+| Le Van Hung       | `hung.le`    | Class A | IFA-2024-003   |
+| Pham Thi Mai      | `mai.pham`   | Class B | IFA-2024-004   |
+| Hoang Van Nam     | `nam.hoang`  | Class B | IFA-2024-005   |
+| Vu Thi Huong      | `huong.vu`   | Class B | IFA-2024-006   |
+| Dang Van Tuan     | `tuan.dang`  | Class C | IFA-2024-007   |
+| Bui Thi Ngoc      | `ngoc.bui`   | Class C | IFA-2024-008   |
+| Do Van Phuc       | `phuc.do`    | Class C | IFA-2024-009   |
+| Ngo Thi Thu       | `thu.ngo`    | Class A | IFA-2024-010   |
+
+In total, seeding creates:
 
 - **10 students** across 3 classes
 - **6 competitions** — 2 upcoming, 2 ongoing, 2 closed, so every status
